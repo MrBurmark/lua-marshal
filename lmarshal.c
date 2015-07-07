@@ -151,7 +151,7 @@ static void mar_encode_value(lua_State *L, mar_Buffer *buf, int val, size_t *idx
 
                 lua_remove(L, -2); /* __persist */
 
-                lua_newtable(L);
+                lua_createtable(L, 1, 0);
                 lua_pushvalue(L, -2); /* callback */
                 lua_rawseti(L, -2, 1);
 
@@ -213,7 +213,7 @@ static void mar_encode_value(lua_State *L, mar_Buffer *buf, int val, size_t *idx
 
             lua_pushvalue(L, -1);
             buf_init(L, &rec_buf);
-            lua_dump(L, (lua_Writer)buf_write, &rec_buf);
+            lua_dump(L, (lua_Writer)buf_write, &rec_buf, 0);
 
             buf_write(L, (void*)&tag, MAR_CHR, buf);
             buf_write(L, (void*)&rec_buf.head, MAR_I32, buf);
@@ -221,7 +221,7 @@ static void mar_encode_value(lua_State *L, mar_Buffer *buf, int val, size_t *idx
             buf_done(L, &rec_buf);
             lua_pop(L, 1);
 
-            lua_newtable(L);
+            lua_createtable(L, ar.nups, 0);
             for (i=1; i <= ar.nups; i++) {
                 lua_getupvalue(L, -2, i);
                 lua_rawseti(L, -2, i);
@@ -264,7 +264,7 @@ static void mar_encode_value(lua_State *L, mar_Buffer *buf, int val, size_t *idx
                 if (!lua_isfunction(L, -1)) {
                     luaL_error(L, "__persist must return a function");
                 }
-                lua_newtable(L);
+                lua_createtable(L, 1, 0);
                 lua_pushvalue(L, -2);
                 lua_rawseti(L, -2, 1);
                 lua_remove(L, -2);
@@ -339,7 +339,7 @@ static void mar_decode_value
         }
         else if (tag == MAR_TVAL) {
             mar_next_len(l, uint32_t);
-            lua_newtable(L);
+            lua_createtable(L, 1, 0);
             lua_pushvalue(L, -1);
             lua_rawseti(L, SEEN_IDX, (*idx)++);
             mar_decode_table(L, *p, l, idx);
@@ -347,7 +347,7 @@ static void mar_decode_value
         }
         else if (tag == MAR_TUSR) {
             mar_next_len(l, uint32_t);
-            lua_newtable(L);
+            lua_createtable(L, 1, 0);
             mar_decode_table(L, *p, l, idx);
             lua_rawgeti(L, -1, 1);
             lua_call(L, 0, 1);
@@ -378,16 +378,16 @@ static void mar_decode_value
             dec_buf.size = l;
             dec_buf.head = l;
             dec_buf.seek = 0;
-            lua_load(L, (lua_Reader)buf_read, &dec_buf, "=marshal");
+            lua_load(L, (lua_Reader)buf_read, &dec_buf, "=marshal", NULL);
             mar_incr_ptr(l);
 
             lua_pushvalue(L, -1);
             lua_rawseti(L, SEEN_IDX, (*idx)++);
 
             mar_next_len(l, uint32_t);
-            lua_newtable(L);
+            lua_createtable(L, 2, 0);
             mar_decode_table(L, *p, l, idx);
-            nups = lua_objlen(L, -1);
+            nups = luaL_len(L, -1);
             for (i=1; i <= nups; i++) {
                 lua_rawgeti(L, -1, i);
                 lua_setupvalue(L, -3, i);
@@ -407,7 +407,7 @@ static void mar_decode_value
         }
         else if (tag == MAR_TUSR) {
             mar_next_len(l, uint32_t);
-            lua_newtable(L);
+            lua_createtable(L, 1, 0);
             mar_decode_table(L, *p, l, idx);
             lua_rawgeti(L, -1, 1);
             lua_call(L, 0, 1);
@@ -459,8 +459,8 @@ static int mar_encode(lua_State* L)
     }
     lua_settop(L, 2);
 
-    len = lua_objlen(L, 2);
-    lua_newtable(L);
+    len = luaL_len(L, 2);
+    lua_createtable(L, len, 0);
     for (idx = 1; idx <= len; idx++) {
         lua_rawgeti(L, 2, idx);
         if (lua_isnil(L, -1)) {
@@ -506,8 +506,8 @@ static int mar_decode(lua_State* L)
     }
     lua_settop(L, 2);
 
-    len = lua_objlen(L, 2);
-    lua_newtable(L);
+    len = luaL_len(L, 2);
+    lua_createtable(L, len, 0);
     for (idx = 1; idx <= len; idx++) {
         lua_rawgeti(L, 2, idx);
         lua_rawseti(L, SEEN_IDX, idx);
@@ -530,7 +530,7 @@ static int mar_clone(lua_State* L)
     return 1;
 }
 
-static const luaL_reg R[] =
+static const luaL_Reg R[] =
 {
     {"encode",      mar_encode},
     {"decode",      mar_decode},
@@ -540,8 +540,8 @@ static const luaL_reg R[] =
 
 int luaopen_marshal(lua_State *L)
 {
-    lua_newtable(L);
-    luaL_register(L, NULL, R);
+    luaL_newlibtable(L, R);
+    luaL_setfuncs(L, R, 0);
     return 1;
 }
 
